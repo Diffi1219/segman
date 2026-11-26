@@ -1,4 +1,5 @@
 import math
+import os
 import time
 from typing import Tuple
 import copy
@@ -13,29 +14,27 @@ from einops.layers.torch import Rearrange
 from fvcore.nn import FlopCountAnalysis, flop_count_table
 from mmcv.cnn import ConvModule
 from mmcv.runner import load_state_dict
-from natten import NeighborhoodAttention2D, use_fused_na, use_gemm_na
-from natten.functional import na2d, na2d_av, na2d_qk, natten2dav, natten2dqkrpb
 # from timm.models.vision_transformer import _cfg
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 from timm.models.registry import register_model
 from fvcore.nn import FlopCountAnalysis, flop_count_str, flop_count, parameter_count
-from natten.flops import qk_2d_rpb_flop, av_2d_flop, add_natten_handle
-
-try:
-    from csm_triton import CrossScanTriton, CrossMergeTriton
-except:
-    from .csm_triton import CrossScanTriton, CrossMergeTriton
-
-import selective_scan_cuda_oflex
-
-
 from mmseg.models.builder import BACKBONES
 from mmseg.utils import get_root_logger
 from mmcv.runner import load_checkpoint
 
-# use_gemm_na(True)
-# use_fused_na(True)
+if os.name == 'nt':
+    from ..utils.segman_torch_ops import (cross_merge, cross_scan,
+                                         neighborhood_attention, selective_scan)
+else:
+    import selective_scan_cuda_oflex
+    from natten.flops import av_2d_flop, qk_2d_rpb_flop
+    from natten.functional import na2d, na2d_av, na2d_qk
+
+    try:
+        from csm_triton import CrossScanTriton, CrossMergeTriton
+    except ImportError:
+        from .csm_triton import CrossScanTriton, CrossMergeTriton
 
 def get_continuous_paths(N):
     # Note that N is always even since we use image resolution of 256, 512, 1024 with the SD VAE encoder
@@ -428,16 +427,22 @@ class VSSM(nn.Module):
         return D
     
     def _selective_scan(self, u, delta, A, B, C, D=None, delta_bias=None, delta_softplus=True, nrows=None, backnrows=None, ssoflex=False):
+        if os.name == 'nt':
+            return selective_scan(
+                u, delta, A, B, C, D, delta_bias, delta_softplus, ssoflex)
         return SelectiveScanOflex.apply(u, delta, A, B, C, D, delta_bias, delta_softplus, nrows, backnrows, ssoflex)
 
     def _cross_scan(self, x):
         if not self.ssm_split:
-            return CrossScanTriton.apply(x), None, None, None, None
+            scans = cross_scan(x) if os.name == 'nt' else CrossScanTriton.apply(x)
+            return scans, None, None, None, None
         else:
             return cross_scan_continuous(x, split=True)
     
     def _cross_merge(self, x, paths_lr=None, paths_tb=None, reverse_lr=None, reverse_tb=None):
         if not self.ssm_split:
+            if os.name == 'nt':
+                return cross_merge(x)
             return CrossMergeTriton.apply(x)
         else:
             return cross_merge_continuous(x, paths_lr, paths_tb, reverse_lr, reverse_tb, split=True)
@@ -573,7 +578,12 @@ class Attention(nn.Module):
         else:
             rpb = None
     
-        if self.fused_na:
+        if os.name == 'nt':
+            scale = q.size(-1) ** 0.5 if self.fused_na else 1.0
+            x = neighborhood_attention(
+                q, k, v, toodd(self.window_size), self.window_dilation,
+                rpb=None if self.fused_na else rpb, scale=scale)
+        elif self.fused_na:
             q = rearrange(q, 'b n h w c -> b h w n c')
             k = rearrange(k, 'b n h w c -> b h w n c')
             v = rearrange(v, 'b n h w c -> b h w n c')
@@ -1042,9 +1052,12 @@ class SegMANEncoder(nn.Module):
             "prim::PythonOp.SelectiveScanOflex": selective_scan_flop_jit,
             "prim::PythonOp.SelectiveScanCore": selective_scan_flop_jit,
             "prim::PythonOp.SelectiveScanNRow": selective_scan_flop_jit,
-            "prim::PythonOp.NeighborhoodAttention2DQKAutogradFunction": qk_2d_rpb_flop,
-            "prim::PythonOp.NeighborhoodAttention2DAVAutogradFunction": av_2d_flop,
         }
+        if os.name != 'nt':
+            supported_ops.update({
+                "prim::PythonOp.NeighborhoodAttention2DQKAutogradFunction": qk_2d_rpb_flop,
+                "prim::PythonOp.NeighborhoodAttention2DAVAutogradFunction": av_2d_flop,
+            })
 
         model = copy.deepcopy(self)
         

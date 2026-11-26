@@ -1,0 +1,562 @@
+2026-11-26 11:42:06,150 - mmseg - INFO - OpenCV num_threads is `32
+2026-11-26 11:42:07,871 - mmseg - INFO - Environment info:
+------------------------------------------------------------
+sys.platform: win32
+Python: 3.11.18 | packaged by Anaconda, Inc. | (main, Oct 26 2026, 18:13:29) [MSC v.1942 64 bit (AMD64)]
+CUDA available: True
+GPU 0: NVIDIA GeForce RTX 4060 Laptop GPU
+CUDA_HOME: None
+MSVC: Microsoft (R) C/C++ Optimizing Compiler Version 19.51.36244 for x64
+GCC: n/a
+PyTorch: 2.0.1+cu118
+PyTorch compiling details: PyTorch built with:
+  - C++ Version: 199711
+  - MSVC 193431937
+  - Intel(R) Math Kernel Library Version 2020.0.2 Product Build 20200624 for Intel(R) 64 architecture applications
+  - Intel(R) MKL-DNN v2.7.3 (Git Hash 6dbeffbae1f23cbbeae17adb7b5b13f1f37c080e)
+  - OpenMP 2019
+  - LAPACK is enabled (usually provided by MKL)
+  - CPU capability usage: AVX2
+  - CUDA Runtime 11.8
+  - NVCC architecture flags: -gencode;arch=compute_37,code=sm_37;-gencode;arch=compute_50,code=sm_50;-gencode;arch=compute_60,code=sm_60;-gencode;arch=compute_61,code=sm_61;-gencode;arch=compute_70,code=sm_70;-gencode;arch=compute_75,code=sm_75;-gencode;arch=compute_80,code=sm_80;-gencode;arch=compute_86,code=sm_86;-gencode;arch=compute_90,code=sm_90;-gencode;arch=compute_37,code=compute_37
+  - CuDNN 8.7
+  - Magma 2.5.4
+  - Build settings: BLAS_INFO=mkl, BUILD_TYPE=Release, CUDA_VERSION=11.8, CUDNN_VERSION=8.7.0, CXX_COMPILER=C:/actions-runner/_work/pytorch/pytorch/builder/windows/tmp_bin/sccache-cl.exe, CXX_FLAGS=/DWIN32 /D_WINDOWS /GR /EHsc /w /bigobj /FS -DUSE_PTHREADPOOL -DNDEBUG -DUSE_KINETO -DLIBKINETO_NOCUPTI -DLIBKINETO_NOROCTRACER -DUSE_FBGEMM -DUSE_XNNPACK -DSYMBOLICATE_MOBILE_DEBUG_HANDLE, LAPACK_INFO=mkl, PERF_WITH_AVX=1, PERF_WITH_AVX2=1, PERF_WITH_AVX512=1, TORCH_DISABLE_GPU_ASSERTS=OFF, TORCH_VERSION=2.0.1, USE_CUDA=ON, USE_CUDNN=ON, USE_EXCEPTION_PTR=1, USE_GFLAGS=OFF, USE_GLOG=OFF, USE_MKL=ON, USE_MKLDNN=ON, USE_MPI=OFF, USE_NCCL=OFF, USE_NNPACK=OFF, USE_OPENMP=ON, USE_ROCM=OFF, 
+
+TorchVision: 0.15.2+cu118
+OpenCV: 5.1.0
+MMCV: 1.7.2
+MMCV Compiler: MSVC 192930148
+MMCV CUDA Compiler: 11.8
+MMSegmentation: 0.30.0+9ced66a
+------------------------------------------------------------
+
+2026-11-26 11:42:07,872 - mmseg - INFO - Distributed training: False
+2026-11-26 11:42:08,033 - mmseg - INFO - Config:
+norm_cfg = dict(type='SyncBN', requires_grad=True)
+model = dict(
+    type='EncoderDecoder',
+    pretrained=None,
+    backbone=dict(
+        type='SegMANEncoder_t',
+        style='pytorch',
+        pretrained=
+        'C:/ZZworkspace/zyworkspace/project/weights/cv/SegMAN/SegMAN_Encoder_t.pth.tar'
+    ),
+    decode_head=dict(
+        type='SegMANDecoder',
+        in_channels=[32, 64, 144, 192],
+        in_index=[0, 1, 2, 3],
+        channels=128,
+        dropout_ratio=0.1,
+        num_classes=2,
+        norm_cfg=dict(type='GN', num_groups=32, requires_grad=True),
+        align_corners=False,
+        decoder_params=dict(embed_dim=128),
+        loss_decode=dict(
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
+        feat_proj_dim=192),
+    train_cfg=dict(),
+    test_cfg=dict(mode='whole'))
+dataset_type = 'ADE20KDataset'
+data_root = 'C:/ZZworkspace/zyworkspace/project/datasets/dis/General'
+img_norm_cfg = dict(
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+crop_size = (512, 512)
+train_pipeline = [
+    dict(type='LoadImageFromFile', imdecode_backend='pillow'),
+    dict(type='LoadAnnotations', reduce_zero_label=False),
+    dict(type='Resize', img_scale=(512, 512), keep_ratio=False),
+    dict(type='RandomFlip', prob=0.5),
+    dict(type='PhotoMetricDistortion'),
+    dict(
+        type='Normalize',
+        mean=[123.675, 116.28, 103.53],
+        std=[58.395, 57.12, 57.375],
+        to_rgb=True),
+    dict(type='DefaultFormatBundle'),
+    dict(type='Collect', keys=['img', 'gt_semantic_seg'])
+]
+test_pipeline = [
+    dict(type='LoadImageFromFile', imdecode_backend='pillow'),
+    dict(
+        type='MultiScaleFlipAug',
+        img_scale=(512, 512),
+        flip=False,
+        transforms=[
+            dict(type='AlignedResize', keep_ratio=False, size_divisor=32),
+            dict(type='RandomFlip'),
+            dict(
+                type='Normalize',
+                mean=[123.675, 116.28, 103.53],
+                std=[58.395, 57.12, 57.375],
+                to_rgb=True),
+            dict(type='ImageToTensor', keys=['img']),
+            dict(type='Collect', keys=['img'])
+        ])
+]
+data = dict(
+    workers_per_gpu=2,
+    samples_per_gpu=1,
+    train_dataloader=dict(drop_last=False),
+    train=dict(
+        type='CustomDataset',
+        data_root='C:/ZZworkspace/zyworkspace/project/datasets/dis/General',
+        img_suffix='.tif',
+        seg_map_suffix='.tif',
+        classes=('background', 'solar_panel'),
+        palette=[[0, 0, 0], [255, 80, 0]],
+        reduce_zero_label=False,
+        img_dir='train/image',
+        ann_dir='train/label',
+        pipeline=[
+            dict(type='LoadImageFromFile', imdecode_backend='pillow'),
+            dict(type='LoadAnnotations', reduce_zero_label=False),
+            dict(type='Resize', img_scale=(512, 512), keep_ratio=False),
+            dict(type='RandomFlip', prob=0.5),
+            dict(type='PhotoMetricDistortion'),
+            dict(
+                type='Normalize',
+                mean=[123.675, 116.28, 103.53],
+                std=[58.395, 57.12, 57.375],
+                to_rgb=True),
+            dict(type='DefaultFormatBundle'),
+            dict(type='Collect', keys=['img', 'gt_semantic_seg'])
+        ]),
+    val_dataloader=dict(samples_per_gpu=1, drop_last=False),
+    val=dict(
+        type='CustomDataset',
+        data_root='C:/ZZworkspace/zyworkspace/project/datasets/dis/General',
+        img_suffix='.tif',
+        seg_map_suffix='.tif',
+        classes=('background', 'solar_panel'),
+        palette=[[0, 0, 0], [255, 80, 0]],
+        reduce_zero_label=False,
+        img_dir='val/image',
+        ann_dir='val/label',
+        pipeline=[
+            dict(type='LoadImageFromFile', imdecode_backend='pillow'),
+            dict(
+                type='MultiScaleFlipAug',
+                img_scale=(512, 512),
+                flip=False,
+                transforms=[
+                    dict(
+                        type='AlignedResize',
+                        keep_ratio=False,
+                        size_divisor=32),
+                    dict(type='RandomFlip'),
+                    dict(
+                        type='Normalize',
+                        mean=[123.675, 116.28, 103.53],
+                        std=[58.395, 57.12, 57.375],
+                        to_rgb=True),
+                    dict(type='ImageToTensor', keys=['img']),
+                    dict(type='Collect', keys=['img'])
+                ])
+        ]),
+    test_dataloader=dict(samples_per_gpu=1),
+    test=dict(
+        type='CustomDataset',
+        data_root='C:/ZZworkspace/zyworkspace/project/datasets/dis/General',
+        img_suffix='.tif',
+        seg_map_suffix='.tif',
+        classes=('background', 'solar_panel'),
+        palette=[[0, 0, 0], [255, 80, 0]],
+        reduce_zero_label=False,
+        img_dir='test/image',
+        ann_dir='test/label',
+        pipeline=[
+            dict(type='LoadImageFromFile', imdecode_backend='pillow'),
+            dict(
+                type='MultiScaleFlipAug',
+                img_scale=(512, 512),
+                flip=False,
+                transforms=[
+                    dict(
+                        type='AlignedResize',
+                        keep_ratio=False,
+                        size_divisor=32),
+                    dict(type='RandomFlip'),
+                    dict(
+                        type='Normalize',
+                        mean=[123.675, 116.28, 103.53],
+                        std=[58.395, 57.12, 57.375],
+                        to_rgb=True),
+                    dict(type='ImageToTensor', keys=['img']),
+                    dict(type='Collect', keys=['img'])
+                ])
+        ]))
+log_config = dict(
+    interval=1,
+    hooks=[
+        dict(type='TextLoggerHook', by_epoch=False),
+        dict(type='TensorboardLoggerHook', by_epoch=False)
+    ])
+dist_params = dict(backend='nccl')
+log_level = 'INFO'
+load_from = None
+resume_from = None
+workflow = [('train', 1)]
+cudnn_benchmark = True
+optimizer = dict(
+    type='AdamW',
+    lr=6e-05,
+    betas=(0.9, 0.999),
+    weight_decay=0.01,
+    paramwise_cfg=dict(
+        custom_keys=dict(
+            pos_block=dict(decay_mult=0.0),
+            norm=dict(decay_mult=0.0),
+            head=dict(lr_mult=10.0))))
+optimizer_config = dict()
+lr_config = dict(
+    policy='poly',
+    warmup='linear',
+    warmup_iters=1,
+    warmup_ratio=1e-06,
+    power=1.0,
+    min_lr=0.0,
+    by_epoch=False)
+runner = dict(type='IterBasedRunner', max_iters=10)
+checkpoint_config = dict(
+    by_epoch=False, interval=1, save_last=True, max_keep_ckpts=3)
+evaluation = dict(
+    interval=1,
+    metric=['mIoU', 'mDice', 'mFscore'],
+    save_best='mIoU',
+    priority='LOW',
+    pre_eval=True,
+    fixed_vis_names=[
+        'F47Mosaic_F47D001008_00000018', 'F48Mosaic_F48D001002_00000043',
+        'F48Mosaic_F48D002001_00000057', 'F48Mosaic_F48D002003_00000091'
+    ])
+classes = ('background', 'solar_panel')
+palette = [[0, 0, 0], [255, 80, 0]]
+input_size = (512, 512)
+dataset = dict(
+    type='CustomDataset',
+    data_root='C:/ZZworkspace/zyworkspace/project/datasets/dis/General',
+    img_suffix='.tif',
+    seg_map_suffix='.tif',
+    classes=('background', 'solar_panel'),
+    palette=[[0, 0, 0], [255, 80, 0]],
+    reduce_zero_label=False)
+fixed_vis_names = [
+    'F47Mosaic_F47D001008_00000018', 'F48Mosaic_F48D001002_00000043',
+    'F48Mosaic_F48D002001_00000057', 'F48Mosaic_F48D002003_00000091'
+]
+find_unused_parameters = False
+work_dir = './work_dirs\segman_t_general'
+gpu_ids = [0]
+auto_resume = False
+
+2026-11-26 11:42:08,034 - mmseg - INFO - Set random seed to 42, deterministic: False
+2026-11-26 11:42:08,241 - mmseg - INFO - loaded pretrained weights using state_dict_ema from C:/ZZworkspace/zyworkspace/project/weights/cv/SegMAN/SegMAN_Encoder_t.pth.tar
+2026-11-26 11:42:08,291 - mmseg - INFO - EncoderDecoder(
+  (backbone): SegMANEncoder(
+    (patch_embed): Sequential(
+      (0): Conv2d(3, 16, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+      (1): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (2): GELU(approximate='none')
+      (3): Conv2d(16, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (4): BatchNorm2d(16, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (5): GELU(approximate='none')
+      (6): Conv2d(16, 32, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+      (7): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (8): GELU(approximate='none')
+      (9): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (10): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+    )
+    (layers): ModuleList(
+      (0): BasicLayer(
+        (rope): RoPE()
+        (blocks): ModuleList(
+          (0-1): 2 x Block(
+            (cpe1): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=32)
+            (norm1): LayerNorm2d((32,), eps=1e-06, elementwise_affine=True)
+            (token_mixer): Attention(
+              (qkv): Conv2d(32, 96, kernel_size=(1, 1), stride=(1, 1))
+              (lepe): Conv2d(32, 32, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=32)
+              (proj): Conv2d(32, 32, kernel_size=(1, 1), stride=(1, 1))
+              (dwconv): Sequential(
+                (0): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=32)
+                (1): BatchNorm2d(32, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+              )
+              (ssm): VSSM()
+              (norm): LayerNorm2d((32,), eps=1e-06, elementwise_affine=True)
+              (rpb): ParameterList(  (0): Parameter containing: [torch.float32 of size 1x21x21])
+            )
+            (cpe2): Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=32)
+            (norm2): LayerNorm2d((32,), eps=1e-06, elementwise_affine=True)
+            (mlp): FFN(
+              (fc1): Conv2d(32, 128, kernel_size=(1, 1), stride=(1, 1))
+              (act_layer): GELU(approximate='none')
+              (dwconv): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=128)
+              (fc2): Conv2d(128, 32, kernel_size=(1, 1), stride=(1, 1))
+              (drop): Identity()
+            )
+            (drop_path): Identity()
+            (layer_scale1): Identity()
+            (layer_scale2): Identity()
+          )
+        )
+      )
+      (1): Sequential(
+        (0): Conv2d(32, 64, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+        (1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (2): BasicLayer(
+        (rope): RoPE()
+        (blocks): ModuleList(
+          (0-1): 2 x Block(
+            (cpe1): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=64)
+            (norm1): LayerNorm2d((64,), eps=1e-06, elementwise_affine=True)
+            (token_mixer): Attention(
+              (qkv): Conv2d(64, 192, kernel_size=(1, 1), stride=(1, 1))
+              (lepe): Conv2d(64, 64, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=64)
+              (proj): Conv2d(64, 64, kernel_size=(1, 1), stride=(1, 1))
+              (dwconv): Sequential(
+                (0): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=64)
+                (1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+              )
+              (ssm): VSSM()
+              (norm): LayerNorm2d((64,), eps=1e-06, elementwise_affine=True)
+              (rpb): ParameterList(  (0): Parameter containing: [torch.float32 of size 2x17x17])
+            )
+            (cpe2): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=64)
+            (norm2): LayerNorm2d((64,), eps=1e-06, elementwise_affine=True)
+            (mlp): FFN(
+              (fc1): Conv2d(64, 256, kernel_size=(1, 1), stride=(1, 1))
+              (act_layer): GELU(approximate='none')
+              (dwconv): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=256)
+              (fc2): Conv2d(256, 64, kernel_size=(1, 1), stride=(1, 1))
+              (drop): Identity()
+            )
+            (drop_path): Identity()
+            (layer_scale1): Identity()
+            (layer_scale2): Identity()
+          )
+        )
+      )
+      (3): Sequential(
+        (0): Conv2d(64, 144, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+        (1): BatchNorm2d(144, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (4): BasicLayer(
+        (rope): RoPE()
+        (blocks): ModuleList(
+          (0-3): 4 x Block(
+            (cpe1): Conv2d(144, 144, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=144)
+            (norm1): LayerNorm2d((144,), eps=1e-06, elementwise_affine=True)
+            (token_mixer): Attention(
+              (qkv): Conv2d(144, 432, kernel_size=(1, 1), stride=(1, 1))
+              (lepe): Conv2d(144, 144, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=144)
+              (proj): Conv2d(144, 144, kernel_size=(1, 1), stride=(1, 1))
+              (dwconv): Sequential(
+                (0): Conv2d(144, 144, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=144)
+                (1): BatchNorm2d(144, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+              )
+              (ssm): VSSM()
+              (norm): LayerNorm2d((144,), eps=1e-06, elementwise_affine=True)
+              (rpb): ParameterList(  (0): Parameter containing: [torch.float32 of size 4x17x17])
+            )
+            (cpe2): Conv2d(144, 144, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=144)
+            (norm2): LayerNorm2d((144,), eps=1e-06, elementwise_affine=True)
+            (mlp): FFN(
+              (fc1): Conv2d(144, 432, kernel_size=(1, 1), stride=(1, 1))
+              (act_layer): GELU(approximate='none')
+              (dwconv): Conv2d(432, 432, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=432)
+              (fc2): Conv2d(432, 144, kernel_size=(1, 1), stride=(1, 1))
+              (drop): Identity()
+            )
+            (drop_path): Identity()
+            (layer_scale1): Identity()
+            (layer_scale2): Identity()
+          )
+        )
+      )
+      (5): Sequential(
+        (0): Conv2d(144, 192, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+        (1): BatchNorm2d(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      )
+      (6): BasicLayer(
+        (rope): RoPE()
+        (blocks): ModuleList(
+          (0-1): 2 x Block(
+            (cpe1): Conv2d(192, 192, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=192)
+            (norm1): LayerNorm2d((192,), eps=1e-06, elementwise_affine=True)
+            (token_mixer): Attention(
+              (qkv): Conv2d(192, 576, kernel_size=(1, 1), stride=(1, 1))
+              (lepe): Conv2d(192, 192, kernel_size=(5, 5), stride=(1, 1), padding=(2, 2), groups=192)
+              (proj): Conv2d(192, 192, kernel_size=(1, 1), stride=(1, 1))
+              (rpb): ParameterList(
+                  (0): Parameter containing: [torch.float32 of size 8x13x13]
+                  (1): Parameter containing: [torch.float32 of size 8x49x49]
+              )
+            )
+            (cpe2): Conv2d(192, 192, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=192)
+            (norm2): LayerNorm2d((192,), eps=1e-06, elementwise_affine=True)
+            (mlp): FFN(
+              (fc1): Conv2d(192, 576, kernel_size=(1, 1), stride=(1, 1))
+              (act_layer): GELU(approximate='none')
+              (dwconv): Conv2d(576, 576, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=576)
+              (fc2): Conv2d(576, 192, kernel_size=(1, 1), stride=(1, 1))
+              (drop): Identity()
+            )
+            (drop_path): Identity()
+            (layer_scale1): Identity()
+            (layer_scale2): Identity()
+          )
+        )
+      )
+      (7): Identity()
+    )
+  )
+  (decode_head): SegMANDecoder(
+    input_transform=multiple_select, ignore_index=255, align_corners=False
+    (loss_decode): CrossEntropyLoss(avg_non_ignore=False)
+    (conv_seg): Conv2d(128, 2, kernel_size=(1, 1), stride=(1, 1))
+    (dropout): Dropout2d(p=0.1, inplace=False)
+    (conv_downsample_2): ConvModule(
+      (conv): Conv2d(128, 256, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+      (bn): _BatchNormXd(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (activate): ReLU(inplace=True)
+    )
+    (conv_downsample_4): ConvModule(
+      (conv): Conv2d(128, 512, kernel_size=(5, 5), stride=(4, 4), padding=(1, 1), bias=False)
+      (bn): _BatchNormXd(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (activate): ReLU(inplace=True)
+    )
+    (linear_c4): MLP(
+      (proj): Linear(in_features=192, out_features=192, bias=True)
+    )
+    (linear_c3): MLP(
+      (proj): Linear(in_features=144, out_features=192, bias=True)
+    )
+    (linear_c2): MLP(
+      (proj): Linear(in_features=64, out_features=192, bias=True)
+    )
+    (linear_fuse): ConvModule(
+      (conv): Conv2d(576, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+      (bn): _BatchNormXd(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (activate): ReLU(inplace=True)
+    )
+    (reduce_channels): ModuleList(
+      (0): ConvModule(
+        (conv): Conv2d(512, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): _BatchNormXd(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (activate): ReLU(inplace=True)
+      )
+      (1): ConvModule(
+        (conv): Conv2d(1024, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): _BatchNormXd(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (activate): ReLU(inplace=True)
+      )
+      (2): ConvModule(
+        (conv): Conv2d(2048, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (bn): _BatchNormXd(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (activate): ReLU(inplace=True)
+      )
+    )
+    (vssm): VSSMBlock(
+      (norm1): LayerNorm2d((384,), eps=1e-06, elementwise_affine=True)
+      (cpe1): Conv2d(384, 384, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=384)
+      (token_mixer): VSSM()
+      (norm2): LayerNorm2d((384,), eps=1e-06, elementwise_affine=True)
+      (cpe2): Conv2d(384, 384, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=384)
+      (mlp): FFN(
+        (fc1): Conv2d(384, 1536, kernel_size=(1, 1), stride=(1, 1))
+        (act_layer): GELU(approximate='none')
+        (dwconv): Conv2d(1536, 1536, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), groups=1536)
+        (fc2): Conv2d(1536, 384, kernel_size=(1, 1), stride=(1, 1))
+        (drop): Identity()
+      )
+      (drop_path): Identity()
+      (layer_scale1): Identity()
+      (layer_scale2): Identity()
+    )
+    (short_path): ConvModule(
+      (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+      (bn): _BatchNormXd(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (activate): ReLU(inplace=True)
+    )
+    (image_pool): Sequential(
+      (0): AdaptiveAvgPool2d(output_size=1)
+      (1): ConvModule(
+        (conv): Conv2d(128, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+        (gn): GroupNorm(32, 128, eps=1e-05, affine=True)
+        (activate): ReLU(inplace=True)
+      )
+    )
+    (proj_out): ConvModule(
+      (conv): Conv2d(384, 192, kernel_size=(1, 1), stride=(1, 1), bias=False)
+      (bn): _BatchNormXd(192, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (activate): ReLU(inplace=True)
+    )
+    (cat): ConvModule(
+      (conv): Conv2d(1216, 128, kernel_size=(1, 1), stride=(1, 1), bias=False)
+      (bn): _BatchNormXd(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (activate): ReLU(inplace=True)
+    )
+  )
+  init_cfg={'type': 'Normal', 'std': 0.01, 'override': {'name': 'conv_seg'}}
+)
+2026-11-26 11:42:08,504 - mmseg - INFO - Loaded 17648 images
+2026-11-26 11:42:08,821 - mmseg - INFO - Loaded 1878 images
+2026-11-26 11:42:08,824 - mmseg - INFO - Start running, host: 23792@ZZBook, work_dir: C:\ZZworkspace\zyworkspace\project\codes\dis\SegMAN\segmentation\work_dirs\segman_t_general
+2026-11-26 11:42:08,824 - mmseg - INFO - Hooks will be executed in the following order:
+before_run:
+(VERY_HIGH   ) PolyLrUpdaterHook                  
+(NORMAL      ) CheckpointHook                     
+(LOW         ) EvalHook                           
+(VERY_LOW    ) TextLoggerHook                     
+(VERY_LOW    ) TensorboardLoggerHook              
+ -------------------- 
+before_train_epoch:
+(VERY_HIGH   ) PolyLrUpdaterHook                  
+(LOW         ) IterTimerHook                      
+(LOW         ) EvalHook                           
+(VERY_LOW    ) TextLoggerHook                     
+(VERY_LOW    ) TensorboardLoggerHook              
+ -------------------- 
+before_train_iter:
+(VERY_HIGH   ) PolyLrUpdaterHook                  
+(LOW         ) IterTimerHook                      
+(LOW         ) EvalHook                           
+ -------------------- 
+after_train_iter:
+(ABOVE_NORMAL) OptimizerHook                      
+(NORMAL      ) CheckpointHook                     
+(LOW         ) IterTimerHook                      
+(LOW         ) EvalHook                           
+(VERY_LOW    ) TextLoggerHook                     
+(VERY_LOW    ) TensorboardLoggerHook              
+ -------------------- 
+after_train_epoch:
+(NORMAL      ) CheckpointHook                     
+(LOW         ) EvalHook                           
+(VERY_LOW    ) TextLoggerHook                     
+(VERY_LOW    ) TensorboardLoggerHook              
+ -------------------- 
+before_val_epoch:
+(LOW         ) IterTimerHook                      
+(VERY_LOW    ) TextLoggerHook                     
+(VERY_LOW    ) TensorboardLoggerHook              
+ -------------------- 
+before_val_iter:
+(LOW         ) IterTimerHook                      
+ -------------------- 
+after_val_iter:
+(LOW         ) IterTimerHook                      
+ -------------------- 
+after_val_epoch:
+(VERY_LOW    ) TextLoggerHook                     
+(VERY_LOW    ) TensorboardLoggerHook              
+ -------------------- 
+after_run:
+(VERY_LOW    ) TextLoggerHook                     
+(VERY_LOW    ) TensorboardLoggerHook              
+ -------------------- 
+2026-11-26 11:42:08,824 - mmseg - INFO - workflow: [('train', 1)], max: 10 iters
+2026-11-26 11:42:08,824 - mmseg - INFO - Checkpoints will be saved to C:\ZZworkspace\zyworkspace\project\codes\dis\SegMAN\segmentation\work_dirs\segman_t_general by HardDiskBackend.

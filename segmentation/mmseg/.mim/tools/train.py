@@ -51,6 +51,13 @@ def parse_args():
         default=0,
         help='id of gpu to use '
         '(only applicable to non-distributed training)')
+    
+    parser.add_argument(
+        '--drop-path',
+        default=-1,
+        type=float,
+        help='drop-path-rate of the backbone network')
+    
     parser.add_argument('--seed', type=int, default=None, help='random seed')
     parser.add_argument(
         '--diff_seed',
@@ -86,7 +93,7 @@ def parse_args():
         choices=['none', 'pytorch', 'slurm', 'mpi'],
         default='none',
         help='job launcher')
-    parser.add_argument('--local_rank', type=int, default=0)
+    parser.add_argument('--local-rank', type=int, default=0)
     parser.add_argument(
         '--auto-resume',
         action='store_true',
@@ -115,6 +122,7 @@ def main():
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)
 
+    cfg.find_unused_parameters = False
     # set cudnn_benchmark
     if cfg.get('cudnn_benchmark', False):
         torch.backends.cudnn.benchmark = True
@@ -147,6 +155,13 @@ def main():
 
     cfg.auto_resume = args.auto_resume
 
+    if args.drop_path >= 0:
+        try:
+            cfg.model.backbone.drop_path_rate = args.drop_path
+        except:
+            logger.info('drop_path is not defined in the config file')   
+    
+    
     # init distributed env first, since logger depends on the dist info.
     if args.launcher == 'none':
         distributed = False

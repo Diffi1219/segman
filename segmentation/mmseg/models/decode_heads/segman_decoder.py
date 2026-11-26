@@ -4,6 +4,7 @@
 # This work is licensed under the NVIDIA Source Code License
 # ---------------------------------------------------------------
 import numpy as np
+import os
 import torch.nn as nn
 import torch
 from mmcv.cnn import ConvModule, DepthwiseSeparableConvModule
@@ -32,26 +33,22 @@ from einops import einsum, rearrange, repeat
 from einops.layers.torch import Rearrange
 from fvcore.nn import FlopCountAnalysis, flop_count_table
 from mmcv.cnn import ConvModule
-from natten import NeighborhoodAttention2D, use_fused_na, use_gemm_na
-from natten.functional import na2d, na2d_av, na2d_qk, natten2dav, natten2dqkrpb
 # from timm.models.vision_transformer import _cfg
 from timm.data import IMAGENET_DEFAULT_MEAN, IMAGENET_DEFAULT_STD
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 from timm.models.registry import register_model
 from fvcore.nn import FlopCountAnalysis, flop_count_str, flop_count, parameter_count
-from natten.flops import qk_2d_rpb_flop, av_2d_flop, add_natten_handle
+if os.name == 'nt':
+    from ..utils.segman_torch_ops import (cross_merge, cross_scan,
+                                         neighborhood_attention, selective_scan)
+else:
+    import selective_scan_cuda_oflex
+    from natten.functional import na2d_av, na2d_qk
 
-try:
-    from csm_triton import CrossScanTriton, CrossMergeTriton
-except:
-    from .csm_triton import CrossScanTriton, CrossMergeTriton
-
-import selective_scan_cuda_oflex
-
-
-
-# use_gemm_na(True)
-# use_fused_na(True)
+    try:
+        from csm_triton import CrossScanTriton, CrossMergeTriton
+    except ImportError:
+        from .csm_triton import CrossScanTriton, CrossMergeTriton
 
 import torch
 import numpy as np
@@ -592,12 +589,19 @@ class VSSM(nn.Module):
         return D
     
     def _selective_scan(self, u, delta, A, B, C, D=None, delta_bias=None, delta_softplus=True, nrows=None, backnrows=None, ssoflex=False):
+        if os.name == 'nt':
+            return selective_scan(
+                u, delta, A, B, C, D, delta_bias, delta_softplus, ssoflex)
         return SelectiveScanOflex.apply(u, delta, A, B, C, D, delta_bias, delta_softplus, nrows, backnrows, ssoflex)
 
     def _cross_scan(self, x):
+        if os.name == 'nt':
+            return cross_scan(x)
         return CrossScanTriton.apply(x)
     
     def _cross_merge(self, x):
+        if os.name == 'nt':
+            return cross_merge(x)
         return CrossMergeTriton.apply(x)
     
     
@@ -723,9 +727,13 @@ class Attention(nn.Module):
         else:
             rpb = None
               
-        attn = na2d_qk(q, k, kernel_size=toodd(self.window_size), dilation=self.window_dilation, rpb=rpb)
-        attn = torch.softmax(attn, dim=-1) # b, h, h, w, k^2
-        x = na2d_av(attn, v, kernel_size=toodd(self.window_size), dilation=self.window_dilation)
+        if os.name == 'nt':
+            x = neighborhood_attention(
+                q, k, v, toodd(self.window_size), self.window_dilation, rpb)
+        else:
+            attn = na2d_qk(q, k, kernel_size=toodd(self.window_size), dilation=self.window_dilation, rpb=rpb)
+            attn = torch.softmax(attn, dim=-1) # b, h, h, w, k^2
+            x = na2d_av(attn, v, kernel_size=toodd(self.window_size), dilation=self.window_dilation)
 
         x = rearrange(x, 'b n_h h w c -> b (n_h c) h w', n_h=self.num_heads).contiguous()
         x = x + lepe

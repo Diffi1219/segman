@@ -19,6 +19,7 @@ class EvalHook(_EvalHook):
             save CPU memory during evaluation. Default: False.
         pre_eval (bool): Whether to use progressive mode to evaluate model.
             Default: False.
+        preview (callable, optional): Render previews after evaluation.
     Returns:
         list: The prediction results.
     """
@@ -30,9 +31,11 @@ class EvalHook(_EvalHook):
                  by_epoch=False,
                  efficient_test=False,
                  pre_eval=False,
+                 preview=None,
                  **kwargs):
         super().__init__(*args, by_epoch=by_epoch, **kwargs)
         self.pre_eval = pre_eval
+        self.preview = preview
         self.latest_results = None
 
         if efficient_test:
@@ -56,6 +59,8 @@ class EvalHook(_EvalHook):
         key_score = self.evaluate(runner, results)
         if self.save_best:
             self._save_ckpt(runner, key_score)
+        if self.preview is not None:
+            self.preview(runner, self.by_epoch)
 
 
 class DistEvalHook(_DistEvalHook):
@@ -69,6 +74,7 @@ class DistEvalHook(_DistEvalHook):
             save CPU memory during evaluation. Default: False.
         pre_eval (bool): Whether to use progressive mode to evaluate model.
             Default: False.
+        preview (callable, optional): Render previews on rank zero.
     Returns:
         list: The prediction results.
     """
@@ -80,9 +86,11 @@ class DistEvalHook(_DistEvalHook):
                  by_epoch=False,
                  efficient_test=False,
                  pre_eval=False,
+                 preview=None,
                  **kwargs):
         super().__init__(*args, by_epoch=by_epoch, **kwargs)
         self.pre_eval = pre_eval
+        self.preview = preview
         self.latest_results = None
         if efficient_test:
             warnings.warn(
@@ -130,3 +138,5 @@ class DistEvalHook(_DistEvalHook):
 
             if self.save_best:
                 self._save_ckpt(runner, key_score)
+            if self.preview is not None:
+                self.preview(runner, self.by_epoch)

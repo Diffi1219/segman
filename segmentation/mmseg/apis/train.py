@@ -2,6 +2,7 @@
 import os
 import random
 import warnings
+from copy import copy
 
 import mmcv
 import numpy as np
@@ -13,9 +14,11 @@ from mmcv.utils import build_from_cfg
 
 from mmseg import digit_version
 from mmseg.core import DistEvalHook, EvalHook, build_optimizer
-from mmseg.datasets import build_dataloader, build_dataset
+from mmseg.datasets import CustomDataset, build_dataloader, build_dataset
 from mmseg.utils import (build_ddp, build_dp, find_latest_checkpoint,
                          get_root_logger)
+
+from .validation_preview import ValidationPreview
 
 
 def init_random_seed(seed=None, device='cuda'):
@@ -153,6 +156,18 @@ def train_segmentor(model,
     # register eval hooks
     if validate:
         val_dataset = build_dataset(cfg.data.val, dict(test_mode=True))
+        eval_cfg = cfg.get('evaluation', {}).copy()
+        fixed_vis_names = eval_cfg.pop('fixed_vis_names', None)
+        preview = None
+        if fixed_vis_names:
+            preview_dataset = val_dataset
+            if cfg.data.val.get('split') is not None:
+                full_val_cfg = cfg.data.val.copy()
+                full_val_cfg.pop('split')
+                preview_dataset = build_dataset(
+                    full_val_cfg, dict(test_mode=True))
+            preview = ValidationPreview(preview_dataset, fixed_vis_names)
+
         # The specific dataloader settings
         val_loader_cfg = {
             **loader_cfg,
@@ -160,14 +175,25 @@ def train_segmentor(model,
             'shuffle': False,  # Not shuffle by default
             **cfg.data.get('val_dataloader', {}),
         }
+        val_indices = val_loader_cfg.pop('indices', None)
+        if val_indices is not None:
+            if not isinstance(val_dataset, CustomDataset):
+                raise TypeError('val_dataloader.indices requires CustomDataset')
+            if not val_indices:
+                raise ValueError('val_dataloader.indices must contain an index')
+            val_dataset = copy(val_dataset)
+            val_dataset.img_infos = [
+                val_dataset.img_infos[i] for i in val_indices
+            ]
         val_dataloader = build_dataloader(val_dataset, **val_loader_cfg)
-        eval_cfg = cfg.get('evaluation', {})
         eval_cfg['by_epoch'] = cfg.runner['type'] != 'IterBasedRunner'
         eval_hook = DistEvalHook if distributed else EvalHook
+        priority = eval_cfg.pop('priority', 'LOW')
         # In this PR (https://github.com/open-mmlab/mmcv/pull/1193), the
         # priority of IterTimerHook has been modified from 'NORMAL' to 'LOW'.
         runner.register_hook(
-            eval_hook(val_dataloader, **eval_cfg), priority='LOW')
+            eval_hook(val_dataloader, preview=preview, **eval_cfg),
+            priority=priority)
 
     # user-defined hooks
     if cfg.get('custom_hooks', None):
